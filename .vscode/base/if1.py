@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Filename: if. py
+# Filename: if1. py
 number = 23
 guess = int(input(' Enter an integer :' ))
 if guess == number:
