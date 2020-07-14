@@ -1,14 +1,11 @@
-msg = 'hello zhangsan,\
-nice to meet you'
+print("hello")
 
-print(msg)
 
-#自然字符串
-msg2 = r"Newlines are indicated by \n"
-print(msg2)
+def aaa():
+    print("!!!!!!")
 
-msg3 =u"This is a Unicode string."
-print(msg3)
 
-msg4 = 'What\'s' ' your name?'
-print(msg4)
+def bbb():
+    print('沫沫是个阿雕')
+
+bbb()
