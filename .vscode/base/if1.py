@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # Filename: if1. py
 number = 23
-guess = int(input(' Enter an integer :' ))
+guess = int(input(' Enter an integer :'))
 if guess == number:
     print('Congratulations, you guessed it.') # New block starts here
     print("but you do not win any prizes!)") # New block ends here
