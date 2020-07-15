@@ -3,7 +3,7 @@
 import requests
 import re
 import time
-save_file = r'D:\PythonWork\xiaoao1.html'
+save_file = r'D:\Python\workspace\xiaoao1.html'
 menu_url = 'https://www.5atxt.com/24_24752/'
 context_url = 'https://www.5atxt.com/24_24752/{}.html'
 reg_context = '<div id="content" deep="3">(.*?)<p>(.*?)</p>(.*?)<div align="center">(.*?)</div>'
