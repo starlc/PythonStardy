@@ -28,7 +28,7 @@ data1 = convertRowToTuple(1)
 # print(header)
 # print(data1)
 # 即将写入数据的文件名
-filename2 = r'D:\Python\workspace\人员导入模板 --新增100W.xlsx'
+filename2 = r'.vscode\export\人员导入模板 --新增50W.xlsx'
 # 如果数据量非常大，可以启用constant_memory，这是一种顺序写入模式，得到一行数据就立刻写入一行，而不会把所有的数据都保持在内存中。
 # 如果不启用此模式，当数据量巨大时，程序很大概率地卡死
 workbook = xlsxwriter.Workbook(filename2, {'constant_memory': True})
@@ -38,7 +38,7 @@ worksheet = workbook.add_worksheet()
 startNum = 1
 # 初始值，后面的数字在它们的基础上依次增加
 startValues = [
-    '0000001', '1000001', '1000001', '1000001', '1000001', '1000001'
+    '0000001', '0000001', '0000001', '0000001', '0000001', '0000001'
 ]
 # 初始值对应的列
 col = ['A', 'B', 'C', 'E', 'F', 'H']
@@ -46,12 +46,50 @@ indexs = [
     'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O',
     'P', 'Q'
 ]
+
 #先将表头写入文件
 worksheet.write_row('A' + str(startNum), header)
+
+
+# 补齐N位
+def getRealVal(prefix, content, length):
+    if length != 0:
+        content = str(content)
+        content = '0' * (length - len(content)) + content
+        content = prefix + content
+    return content
+
+
+def roundVal(i, sub, div, mod):
+    return int((i - sub) / div) % mod
+
+
+# 定义顺序
+mydate = []
+for i in range(500000):
+    strDate = 'zz_BA2f_'
+    j = int(i / 10)
+    if (j < 5000):
+        strDate = getRealVal("zz_BA2f_", j + 1, 5)
+    elif j < 10000:
+        strDate = getRealVal("zz_BA3f_", j - 4999, 5)
+    elif j < 20000:
+        strDate = getRealVal("zz_BA4f_", j - 9999, 5)
+    elif j < 30000:
+        strDate = getRealVal("zz_BA5f_", j - 19999, 5)
+    elif j < 40000:
+        strDate = getRealVal("zz_BA6f_", j - 29999, 5)
+    else:
+        strDate = getRealVal("zz_BA7f_", j - 39999, 5)
+
+    if j % 1000 == 0:
+        print(strDate)
+    mydate.append(strDate)
+
 # 正式开始写入数据
-for i in range(1000000):
+for i in range(500000):
     # 为了不让生成过程无聊，加此打印信息以便查看进度
-    if (i % 100000 == 0):
+    if (i % 50000 == 0):
         print('正创建第', i + 1, '条数据')
     # 表头占据了第1行，所以首条数据从第2行开始，当i=0时，写入的数据从A2开始
     # 将data1中的数据依次写入A2、B2、C2……
@@ -68,7 +106,9 @@ for i in range(1000000):
             content = '0' * (length - len(content)) + content
             content = data1[indexs.index(m)] + content
         # 将计算好的值写入到对应的单元格中
-
         worksheet.write(m + str(startNum + i + 1), content)
+
+    content = mydate[i]
+    worksheet.write('D' + str(startNum + i + 1), content)
 # 写完之后关闭workbook，否则会报错
 workbook.close()
