@@ -11,7 +11,8 @@ class ShortInputException(Exception):
 
     def __str__(self):
         return self.msg
-        
+
+
 try:
     s = input('Enter something-->')
     if len(s) < 3:
