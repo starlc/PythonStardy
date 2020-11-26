@@ -79,35 +79,40 @@ for i in range(50000):
     if i < 100:
         print(int(i / 2) % 100)
     mydate[0] = getRealVal("", i + 1, 0)
-    # 小于5000为二级组织
-    if (i < 5000):
+    # 小于500为二级组织
+    if (i < 500):
         mydate[1] = getRealVal("二级组织", i + 1, 5)
         mydate[2] = getRealVal("zz_BA2f_", i + 1, 5)
         two_org.append(mydate[2])
-    elif i < 10000:
-        mydate[1] = getRealVal("三级组织", i - 4999, 5)
-        mydate[2] = getRealVal("zz_BA3f_", i - 4999, 5)
-        mydate[3] = two_org[roundVal(i, 5000, 1, 5000)]
+    elif i < 1500:
+        # 三级1000
+        mydate[1] = getRealVal("三级组织", i - 499, 5)
+        mydate[2] = getRealVal("zz_BA3f_", i - 499, 5)
+        mydate[3] = two_org[roundVal(i, 500, 2, 500)]
         three_org.append(mydate[2])
-    elif i < 20000:
-        mydate[1] = getRealVal("四级组织", i - 9999, 5)
-        mydate[2] = getRealVal("zz_BA4f_", i - 9999, 5)
-        mydate[3] = three_org[roundVal(i, 10000, 2, 5000)]
+    elif i < 2500:
+        # 四级1000
+        mydate[1] = getRealVal("四级组织", i - 1499, 5)
+        mydate[2] = getRealVal("zz_BA4f_", i - 1499, 5)
+        mydate[3] = three_org[roundVal(i, 1500, 1, 1000)]
         four_org.append(mydate[2])
-    elif i < 30000:
-        mydate[1] = getRealVal("五级组织", i - 19999, 5)
-        mydate[2] = getRealVal("zz_BA5f_", i - 19999, 5)
-        mydate[3] = four_org[roundVal(i, 20000, 1, 10000)]
+    elif i < 22500:
+        # 5级2W
+        mydate[1] = getRealVal("五级组织", i - 2499, 5)
+        mydate[2] = getRealVal("zz_BA5f_", i - 2499, 5)
+        mydate[3] = four_org[roundVal(i, 2500, 20, 1000)]
         five_org.append(mydate[2])
-    elif i < 40000:
-        mydate[1] = getRealVal("六级组织", i - 29999, 5)
-        mydate[2] = getRealVal("zz_BA6f_", i - 29999, 5)
-        mydate[3] = five_org[roundVal(i, 30000, 1, 10000)]
+    elif i < 42500:
+        # 6级 2W
+        mydate[1] = getRealVal("六级组织", i - 22499, 5)
+        mydate[2] = getRealVal("zz_BA6f_", i - 22499, 5)
+        mydate[3] = five_org[roundVal(i, 22500, 1, 20000)]
         six_org.append(mydate[2])
     else:
-        mydate[1] = getRealVal("七级组织", i - 39999, 5)
-        mydate[2] = getRealVal("zz_BA7f_", i - 39999, 5)
-        mydate[3] = six_org[roundVal(i, 40000, 1, 10000)]
+        # 7级7500
+        mydate[1] = getRealVal("七级组织", i - 42499, 5)
+        mydate[2] = getRealVal("zz_BA7f_", i - 42499, 5)
+        mydate[3] = six_org[roundVal(i, 42500, 1, 20000)]
 
     worksheet.write_row('A' + str(startNum + i + 1), tuple(mydate))
     # 写完之后关闭workbook，否则会报错

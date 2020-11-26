@@ -69,18 +69,18 @@ mydate = []
 for i in range(500000):
     strDate = 'zz_BA2f_'
     j = int(i / 10)
-    if (j < 5000):
+    if (j < 500):
         strDate = getRealVal("zz_BA2f_", j + 1, 5)
-    elif j < 10000:
-        strDate = getRealVal("zz_BA3f_", j - 4999, 5)
-    elif j < 20000:
-        strDate = getRealVal("zz_BA4f_", j - 9999, 5)
-    elif j < 30000:
-        strDate = getRealVal("zz_BA5f_", j - 19999, 5)
-    elif j < 40000:
-        strDate = getRealVal("zz_BA6f_", j - 29999, 5)
+    elif j < 1500:
+        strDate = getRealVal("zz_BA3f_", j - 499, 5)
+    elif j < 2500:
+        strDate = getRealVal("zz_BA4f_", j - 1499, 5)
+    elif j < 22500:
+        strDate = getRealVal("zz_BA5f_", j - 2499, 5)
+    elif j < 42500:
+        strDate = getRealVal("zz_BA6f_", j - 22499, 5)
     else:
-        strDate = getRealVal("zz_BA7f_", j - 39999, 5)
+        strDate = getRealVal("zz_BA7f_", j - 42499, 5)
 
     if j % 1000 == 0:
         print(strDate)
