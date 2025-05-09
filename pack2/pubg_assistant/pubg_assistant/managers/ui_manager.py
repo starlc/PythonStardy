@@ -112,7 +112,7 @@ class UIManager:
             
         gun_status = "锁" if gun_lock == 1 else "解"
         posture_status = "站" if posture == 1 else "蹲"
-        full_status = "满" if not gun_config else "裸"
+        full_status = "满" if  gun_config else "裸"
         new_character = f"{gun_status}|{full_status}|{posture_status}|{gun_name}"
         
         try:
@@ -134,11 +134,10 @@ class UIManager:
             return
             
         gun_status = "锁" if gun_lock == 1 else "解"
-        # 根据算法类型显示姿势状态，使用模板匹配时添加管道符
-        posture_status = "站|" if posture == 1 and use_template else "站"
-        posture_status = "蹲|" if posture != 1 and use_template else posture_status
+        posture_status = "站" if posture == 1 else "蹲"
         full_status = "满" if gun_config else "裸"
-        new_character = f"{gun_status}|{full_status}|{posture_status}|{gun_name}"
+        method_status = "" if not use_template  else "|"
+        new_character = f"{gun_status}|{full_status}|{posture_status}{method_status}|{gun_name}"
         
         try:
             self.app.update_character(new_character)
