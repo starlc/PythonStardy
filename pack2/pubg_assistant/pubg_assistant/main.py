@@ -71,6 +71,11 @@ def main():
         while True:
             # 更新UI状态
             action_processor._update_display()
+            
+            # 检查是否请求退出程序
+            if action_processor.is_exit_requested():
+                break
+                
             # 短暂休眠，降低CPU使用率
             time.sleep(0.1)
     except KeyboardInterrupt:

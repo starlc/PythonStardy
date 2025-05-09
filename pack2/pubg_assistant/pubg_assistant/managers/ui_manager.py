@@ -120,6 +120,31 @@ class UIManager:
         except:
             pass  # 忽略更新失败
     
+    def update_display_with_algorithm(self, gun_lock, gun_name, posture, gun_config, use_template):
+        """更新显示（带算法指示）
+        
+        Args:
+            gun_lock: 武器锁定状态，0为未锁定，1为锁定
+            gun_name: 武器名称
+            posture: 姿势状态，1为站立，其他为蹲下
+            gun_config: 武器配置状态，True为裸配，False为满配
+            use_template: 是否使用模板匹配算法
+        """
+        if not self.app or not self.running:
+            return
+            
+        gun_status = "锁" if gun_lock == 1 else "解"
+        # 根据算法类型显示姿势状态，使用模板匹配时添加管道符
+        posture_status = "站|" if posture == 1 and use_template else "站"
+        posture_status = "蹲|" if posture != 1 and use_template else posture_status
+        full_status = "满" if gun_config else "裸"
+        new_character = f"{gun_status}|{full_status}|{posture_status}|{gun_name}"
+        
+        try:
+            self.app.update_character(new_character)
+        except:
+            pass  # 忽略更新失败
+    
     def stop_display(self):
         """停止显示界面"""
         try:

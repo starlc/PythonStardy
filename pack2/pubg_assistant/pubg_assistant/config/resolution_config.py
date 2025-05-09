@@ -6,6 +6,8 @@
 负责管理游戏分辨率相关的配置
 """
 
+import os
+
 class ResolutionConfig:
     """分辨率配置类"""
     
@@ -19,9 +21,13 @@ class ResolutionConfig:
         self.width = width
         self.height = height
         
+        # 计算资源目录的基础路径（项目根目录下的resources文件夹）
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        resources_base = os.path.join(base_dir, "resources")
+        
         # 根据分辨率选择配置
         if width == 2560 and height == 1440:
-            self.resources_dir = "../resources/25601440/"
+            self.resources_dir = os.path.join(resources_base, "25601440")
             # 绝对位置配置
             self.ui_position = {"x": 1560, "y": 1370}
             self.weapon_area = {
@@ -37,7 +43,7 @@ class ResolutionConfig:
                 "left": 960, "top": 1315, "width": 5, "height": 5
             }
         elif width == 2313 and height == 1440:
-            self.resources_dir = "../resources/23131440/"
+            self.resources_dir = os.path.join(resources_base, "23131440")
             # 绝对位置配置
             self.ui_position = {"x": 1400, "y": 1370}
             self.weapon_area = {
@@ -54,7 +60,7 @@ class ResolutionConfig:
             }
         else:
             # 默认使用2560x1440的绝对位置
-            self.resources_dir = "../resources/25601440/"
+            self.resources_dir = os.path.join(resources_base, "25601440")
             self.ui_position = {"x": 1560, "y": 1370}
             self.weapon_area = {
                 "left": 1940, "top": 1325, "width": 195, "height": 100

@@ -8,6 +8,7 @@
 
 import time
 import ctypes
+import sys
 from pynput import keyboard
 
 class ActionProcessor:
@@ -37,6 +38,9 @@ class ActionProcessor:
         
         # 检测NumLock状态
         self.player_gun_config = not self._is_numlock_on()
+        
+        # 退出标志
+        self.exit_flag = False
     
     def _is_numlock_on(self):
         """检查NumLock状态
@@ -75,11 +79,13 @@ class ActionProcessor:
     
     def _update_display(self):
         """更新显示"""
-        self.ui_manager.update_display(
+        use_template = self.image_processor.is_using_template_matching()
+        self.ui_manager.update_display_with_algorithm(
             self.gun_lock,
             self.get_gun_name(int(self.player_gun)),
             self.player_posture,
-            self.player_gun_config
+            self.player_gun_config,
+            use_template
         )
     
     def _save_player_gun_and_sound(self, gun_id, gun_pos):
@@ -110,6 +116,16 @@ class ActionProcessor:
         # 临时关闭宏
         elif key == 0:
             self._close_weapon(key)
+            return True
+        
+        # 切换匹配算法
+        elif key == 8:
+            self._toggle_algorithm()
+            return True
+        
+        # 退出程序
+        elif key == 9:
+            self._exit_program()
             return True
         
         # 检测NumLock状态
@@ -149,6 +165,28 @@ class ActionProcessor:
         if success:
             self._save_player_gun_and_sound(gun_id, gun_pos)
             print(f"检测到武器: {self.get_gun_name(int(gun_id))}, 位置: {gun_pos}")
+    
+    def _toggle_algorithm(self):
+        """切换匹配算法"""
+        use_template = self.image_processor.toggle_matching_algorithm()
+        if use_template:
+            print("已切换到模板匹配算法")
+        else:
+            print("已切换到特征点匹配算法")
+        self._update_display()
+    
+    def _exit_program(self):
+        """退出程序"""
+        print("收到F9退出指令，正在退出程序...")
+        self.exit_flag = True
+    
+    def is_exit_requested(self):
+        """检查是否请求退出
+        
+        Returns:
+            bool: 是否请求退出
+        """
+        return self.exit_flag
     
     def get_gun_name(self, gun_index):
         """获取武器名称

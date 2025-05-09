@@ -137,6 +137,20 @@ class InputManager:
                 self.action_queue.put(action)
                 return True
             
+            if key == keyboard.Key.f8:
+                # 按下F8 切换算法
+                self.action_queue.queue.clear()
+                action = Action(True, 8)  # 用8表示切换算法
+                self.action_queue.put(action)
+                return True
+            
+            if key == keyboard.Key.f9:
+                # 按下F9 退出程序
+                self.action_queue.queue.clear()
+                action = Action(True, 9)  # 用9表示退出程序
+                self.action_queue.put(action)
+                return True
+            
             if key == keyboard.Key.num_lock:
                 # 按下numlock 变更numLock状态
                 self.action_queue.queue.clear()
