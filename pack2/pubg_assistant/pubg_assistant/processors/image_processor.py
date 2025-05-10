@@ -13,6 +13,7 @@ import json
 from PIL import Image
 from datetime import datetime
 from mss import mss
+import threading
 
 class ImageProcessor:
     """图像处理器类"""
@@ -36,12 +37,12 @@ class ImageProcessor:
         self.temp_dir = os.path.join(self.resources_base, "temp2313")
         self.posture_temp_dir = os.path.join(self.resources_base, "posturetemp")
         
-        # 优化1: 初始化截图工具和常用对象
-        self.sct = mss()
-        
         # 优化2: 预先创建ORB检测器，避免重复创建
         self.orb = cv.ORB_create()
         self.bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
+        
+        # 线程本地存储，每个线程使用自己的mss实例
+        self.thread_local = threading.local()
         
         # 初始化武器图像字典
         self._initialize_gun_images()
@@ -72,6 +73,16 @@ class ImageProcessor:
         kp, des = self.orb.detectAndCompute(img, None)
         return (kp, des)
     
+    def _get_sct(self):
+        """获取当前线程的mss实例
+        
+        Returns:
+            mss实例
+        """
+        if not hasattr(self.thread_local, 'sct'):
+            self.thread_local.sct = mss()
+        return self.thread_local.sct
+    
     def screenshot(self, box):
         """截图
         
@@ -81,8 +92,9 @@ class ImageProcessor:
         Returns:
             shot: 截图对象
         """
-        # 优化4: 直接使用实例化的截图工具
-        shot = self.sct.grab(box)
+        # 使用线程本地的mss实例
+        sct = self._get_sct()
+        shot = sct.grab(box)
         return shot
     
     def save_temp_pic(self, img, path, is_save):
