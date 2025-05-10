@@ -35,7 +35,7 @@ class ImageProcessor:
         self.resolution_config = resolution_config
         self.global_seq = 1
         self.gun_img_dict = {}
-        self.use_template_matching = False
+        self.use_template_matching = True
         
         # 路径设置
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
