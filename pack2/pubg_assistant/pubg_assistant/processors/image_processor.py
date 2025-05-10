@@ -213,8 +213,8 @@ class ImageProcessor:
             template = cv.resize(template, (target.shape[1], target.shape[0]))
             
         try:
-            # 使用更快的TM_CCORR_NORMED模板匹配方法
-            result = cv.matchTemplate(target, template, cv.TM_CCORR_NORMED)
+            # 使用更快的TM_CCORR_NORMED模板匹配方法 TM_CCOEFF_NORMED
+            result = cv.matchTemplate(target, template, cv.TM_CCOEFF_NORMED)
             _, max_val, _, _ = cv.minMaxLoc(result)
             
             # 转换为0-100的相似度
