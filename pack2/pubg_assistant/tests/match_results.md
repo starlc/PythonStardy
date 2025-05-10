@@ -1,5 +1,5 @@
 # 模板匹配测试结果
-测试时间: 2025-05-09 02:10:34
+测试时间: 2025-05-11 01:19:24
 模板目录: D:\repository\PythonStardy\pack2\pubg_assistant\resources\25601440
 临时图片目录: D:\repository\PythonStardy\pack2\pubg_assistant\resources\temp2313
 
