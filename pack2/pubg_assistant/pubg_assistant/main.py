@@ -112,7 +112,7 @@ def main():
         logger = setup_default_logger(console_level=console_level)
         
         # 设置控制台
-        os.system("title PUBG Assistant v1.1.0")
+        os.system("title Assistant v1.1.0")
         os.system("mode con cols=50 lines=30")
         show_splash_screen()
         
