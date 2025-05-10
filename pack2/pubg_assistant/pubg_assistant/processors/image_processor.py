@@ -9,14 +9,21 @@
 import cv2 as cv
 import numpy as np
 import os
-import json
+import time
+import threading
 from PIL import Image
 from datetime import datetime
 from mss import mss
-import threading
 
 class ImageProcessor:
-    """图像处理器类"""
+    """图像处理器类，负责截图和图像识别处理"""
+    
+    # 常量定义
+    SIMILARITY_THRESHOLD = 40  # 武器识别相似度阈值
+    LOW_SIMILARITY_THRESHOLD = 10  # 低相似度阈值
+    MATCH_DISTANCE_THRESHOLD = 60  # 特征点匹配距离阈值
+    WHITE_THRESHOLD = 190  # 白色识别阈值
+    MAX_MATCHES_TO_SORT = 100  # 排序的最大匹配点数
     
     def __init__(self, resolution_config):
         """初始化图像处理器
@@ -24,37 +31,39 @@ class ImageProcessor:
         Args:
             resolution_config: 分辨率配置
         """
+        # 基础属性
         self.resolution_config = resolution_config
         self.global_seq = 1
         self.gun_img_dict = {}
-        self.use_template_matching = False  # 是否使用模板匹配算法
+        self.use_template_matching = False
         
-        # 计算资源目录的基础路径
+        # 路径设置
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         self.resources_base = os.path.join(base_dir, "resources")
-        
-        # 临时目录路径
         self.temp_dir = os.path.join(self.resources_base, "temp2313")
         self.posture_temp_dir = os.path.join(self.resources_base, "posturetemp")
         
-        # 优化2: 预先创建ORB检测器，避免重复创建
+        # 图像处理器初始化
         self.orb = cv.ORB_create()
         self.bf = cv.BFMatcher(cv.NORM_HAMMING, crossCheck=True)
         
-        # 线程本地存储，每个线程使用自己的mss实例
+        # 线程本地存储
         self.thread_local = threading.local()
         
-        # 初始化武器图像字典
+        # 初始化武器图像库
         self._initialize_gun_images()
     
+    #---------------------------
+    # 初始化和资源管理方法
+    #---------------------------
+    
     def _initialize_gun_images(self):
-        """初始化武器图像字典"""
+        """初始化武器图像字典，预先加载和计算特征"""
         resources_dir = self.resolution_config.get_resources_dir()
         for file_name in os.listdir(resources_dir):
             if os.path.splitext(file_name)[1] == '.png':
                 gun_id = os.path.splitext(file_name)[0]
                 gun_file = os.path.join(resources_dir, file_name)
-                # 优化3: 提前计算特征点和描述符，避免每次检测时计算
                 img = cv.imread(gun_file, cv.IMREAD_GRAYSCALE)
                 self.gun_img_dict[gun_id] = {
                     'image': img,
@@ -74,7 +83,7 @@ class ImageProcessor:
         return (kp, des)
     
     def _get_sct(self):
-        """获取当前线程的mss实例
+        """获取当前线程的mss实例，确保线程安全
         
         Returns:
             mss实例
@@ -83,8 +92,24 @@ class ImageProcessor:
             self.thread_local.sct = mss()
         return self.thread_local.sct
     
+    def _get_sequence(self):
+        """获取序列号，用于临时文件命名
+        
+        Returns:
+            str: 时间戳加序列号
+        """
+        now = datetime.now()
+        str_date = now.strftime('%Y%m%d%H%M%S')
+        str_seq = f"{self.global_seq:04d}"
+        self.global_seq = self.global_seq + 1
+        return f"{str_date}{str_seq}"
+    
+    #---------------------------
+    # 截图和图像处理基础方法
+    #---------------------------
+    
     def screenshot(self, box):
-        """截图
+        """截取屏幕指定区域
         
         Args:
             box: 截图区域 (left, top, width, height)
@@ -92,13 +117,11 @@ class ImageProcessor:
         Returns:
             shot: 截图对象
         """
-        # 使用线程本地的mss实例
         sct = self._get_sct()
-        shot = sct.grab(box)
-        return shot
+        return sct.grab(box)
     
     def save_temp_pic(self, img, path, is_save):
-        """保存临时图片
+        """保存临时图片，用于调试
         
         Args:
             img: 图片对象
@@ -116,20 +139,8 @@ class ImageProcessor:
         img.save(save_path + '.png', format='PNG')
         return True
     
-    def _get_sequence(self):
-        """获取序列号
-        
-        Returns:
-            str: 序列号
-        """
-        now = datetime.now()
-        str_date = now.strftime('%Y%m%d%H%M%S')
-        str_seq = f"{self.global_seq:04d}"
-        self.global_seq = self.global_seq + 1
-        return f"{str_date}{str_seq}"
-    
     def extract_gun(self, image):
-        """提取图片中的枪(预处理图片)
+        """提取图片中的枪，预处理图片增强对比度
         
         Args:
             image: 图片数组
@@ -140,8 +151,28 @@ class ImageProcessor:
         image[image <= 200] = 0
         return image
     
+    def get_rgb(self, box):
+        """获取指定区域的RGB值，判断是否为白色
+        
+        Args:
+            box: 截图区域 (left, top, width, height)
+            
+        Returns:
+            bool: 是否为白色
+        """
+        img = self.screenshot(box)
+        save_dir = os.path.join(self.posture_temp_dir, '')
+        self.save_temp_pic(img, save_dir, False)
+        r, g, b = img.pixel(3, 3)
+        
+        return r > self.WHITE_THRESHOLD and g > self.WHITE_THRESHOLD and b > self.WHITE_THRESHOLD
+    
+    #---------------------------
+    # 图像匹配算法控制方法
+    #---------------------------
+    
     def toggle_matching_algorithm(self):
-        """切换匹配算法
+        """切换匹配算法，在特征点匹配和模板匹配间切换
         
         Returns:
             bool: 当前是否使用模板匹配算法
@@ -150,12 +181,16 @@ class ImageProcessor:
         return self.use_template_matching
     
     def is_using_template_matching(self):
-        """获取当前使用的匹配算法
+        """获取当前使用的匹配算法类型
         
         Returns:
             bool: 当前是否使用模板匹配算法
         """
         return self.use_template_matching
+    
+    #---------------------------
+    # 图像相似度比较方法
+    #---------------------------
     
     def template_similarity(self, template, target):
         """使用模板匹配计算图像相似度
@@ -165,7 +200,7 @@ class ImageProcessor:
             target: 目标图像
             
         Returns:
-            float: 相似度得分（百分比）
+            float: 相似度得分
         """
         # 确保两个图像是灰度图
         if len(template.shape) > 2:
@@ -177,48 +212,46 @@ class ImageProcessor:
         if template.shape != target.shape:
             template = cv.resize(template, (target.shape[1], target.shape[0]))
             
-        # 使用OpenCV的模板匹配
         try:
-            # 优化5: 对于模板匹配，可以使用TM_CCORR_NORMED，它在某些情况下比TM_CCOEFF_NORMED更快
+            # 使用更快的TM_CCORR_NORMED模板匹配方法
             result = cv.matchTemplate(target, template, cv.TM_CCORR_NORMED)
             _, max_val, _, _ = cv.minMaxLoc(result)
+            
             # 转换为0-100的相似度
             similarity = max_val * 100
-            # 根据相似度计算接近于ORB特征点匹配的点数
-            # 40分以上才被认为有效，相当于特征点匹配的40个点
+            
+            # 根据相似度计算返回点数
             if similarity >= 60:
-                points = int(similarity / 2)
+                return int(similarity / 2)
             elif similarity >= 40:
-                points = int(similarity / 3)
+                return int(similarity / 3)
             else:
-                points = 0
-                
-            return points
+                return 0
         except Exception:
             return 0
     
     def image_similarity_opencv(self, gun_data, img2):
-        """图片相似度比较
+        """计算图片相似度，支持特征点匹配和模板匹配两种方式
         
         Args:
             gun_data: 武器图像数据（字典或图像）
             img2: 目标图像
             
         Returns:
-            int: 相似度
+            int: 相似度分数
         """
-        # 如果启用了模板匹配，则使用模板匹配算法
+        # 使用模板匹配
         if self.use_template_matching:
             template = gun_data['image'] if isinstance(gun_data, dict) else gun_data
             return self.template_similarity(template, img2)
         
-        # 优化6: 使用预计算的特征点和描述符
+        # 使用特征点匹配
         if isinstance(gun_data, dict):
             kp1, des1 = gun_data['kp_des']
         else:
             kp1, des1 = self.orb.detectAndCompute(gun_data, None)
         
-        # 优化7: 直接将截图转换为灰度图，避免多次转换
+        # 确保目标图像是灰度图
         if len(img2.shape) > 2:
             img2 = cv.cvtColor(img2, cv.COLOR_BGRA2GRAY)
         
@@ -226,24 +259,26 @@ class ImageProcessor:
         
         if des1 is None or des2 is None:
             return 0
-            
+        
+        # 执行特征点匹配
         matches = self.bf.match(des1, des2)
         
-        # 优化8: 只对前100个匹配进行排序，以加快速度
-        if len(matches) > 100:
-            matches = sorted(matches, key=lambda x: x.distance)[:100]
+        # 只对部分匹配点排序，提高性能
+        if len(matches) > self.MAX_MATCHES_TO_SORT:
+            matches = sorted(matches, key=lambda x: x.distance)[:self.MAX_MATCHES_TO_SORT]
         else:
             matches = sorted(matches, key=lambda x: x.distance)
         
-        good_matches = 0
-        for m in matches:
-            if m.distance <= 60:
-                good_matches = good_matches + 1
-                
+        # 计算好的匹配点数量
+        good_matches = sum(1 for m in matches if m.distance <= self.MATCH_DISTANCE_THRESHOLD)
         return good_matches
     
+    #---------------------------
+    # 武器检测方法
+    #---------------------------
+    
     def detect_weapon(self, gun_pos):
-        """检测武器
+        """检测武器，识别武器ID
         
         Args:
             gun_pos: 武器位置，1或2
@@ -257,29 +292,26 @@ class ImageProcessor:
                weapon_area['left'] + weapon_area['width'], 
                weapon_area['top'] + weapon_area['height'])
         
-        n = 0
-        time_to_sleep = 0.2  # 优化9: 减少初始等待时间
-        import time
-        time.sleep(time_to_sleep)
+        # 常用武器ID列表，优先检测
+        first_check_gun_ids = ["2", "4", "7", "9", "10", "15", "19", "20", "22", "23"]
         
-        while True:
-            # 截图
+        # 等待游戏UI稳定
+        time.sleep(0.2)
+        
+        # 尝试识别两次
+        for attempt in range(2):
+            # 截图并转换为numpy数组
             img = self.screenshot(box)
-            # 优化10: 直接将PIL图像转换为numpy数组，避免多次转换
             arr = np.array(img.pixels, dtype=np.uint8)
             
-            # 保存临时图片
-            # 使用绝对路径
+            # 保存临时图片（调试用）
             save_dir = os.path.join(self.temp_dir, '')
             self.save_temp_pic(img, save_dir, False)
             
-            # 武器相似度比较
+            # 相似度比较结果记录
             similarity_dict = {}
             max_similarity = 0
             max_gun_id = ""
-            
-            # 优化11: 尝试对部分武器进行相似度计算，避免对所有武器进行计算
-            first_check_gun_ids = ["2", "4", "7","9", "10", "15", "19", "20", "22", "23"]  # 常用武器ID，根据实际情况调整
             
             # 先检查常用武器
             for gun_id in first_check_gun_ids:
@@ -287,87 +319,68 @@ class ImageProcessor:
                     result = self.image_similarity_opencv(self.gun_img_dict[gun_id], arr)
                     similarity_dict[gun_id] = result
                     
-                    if result >= 40:
-                        # 如果相似度大于阈值，返回检测到的武器
+                    # 高相似度直接返回结果
+                    if result >= self.SIMILARITY_THRESHOLD:
                         return True, gun_id
                     
+                    # 记录最高相似度
                     if result > max_similarity:
                         max_similarity = result
                         max_gun_id = gun_id
             
-            # 如果没有找到常用武器，检查其他武器
+            # 检查其他武器
             for gun_id in self.gun_img_dict:
                 if gun_id not in first_check_gun_ids:
                     result = self.image_similarity_opencv(self.gun_img_dict[gun_id], arr)
                     similarity_dict[gun_id] = result
                     
-                    if result >= 40:
-                        # 如果相似度大于阈值，返回检测到的武器
+                    # 高相似度直接返回结果
+                    if result >= self.SIMILARITY_THRESHOLD:
                         return True, gun_id
                     
+                    # 记录最高相似度
                     if result > max_similarity:
                         max_similarity = result
                         max_gun_id = gun_id
             
-            # 如果最大相似度大于10，也认为检测到武器
-            if max_similarity >= 10:
+            # 如果有低相似度匹配也返回
+            if max_similarity >= self.LOW_SIMILARITY_THRESHOLD:
                 return True, max_gun_id
-                
-            n = n + 1
-            if n >= 2:  # 如果2次还没有识别出来，退出循环
-                break
-                
-            time.sleep(0.5)  # 优化12: 减少重试等待时间
             
+            # 第一次尝试未成功，等待后重试
+            if attempt == 0:
+                time.sleep(0.5)
+        
+        # 两次识别都失败，返回未识别
         return False, ""
     
-    def get_rgb(self, box):
-        """获取RGB值
-        
-        Args:
-            box: 截图区域 (left, top, width, height)
-            
-        Returns:
-            bool: 是否为白色
-        """
-        img = self.screenshot(box)
-        # 使用绝对路径
-        save_dir = os.path.join(self.posture_temp_dir, '')
-        self.save_temp_pic(img, save_dir, False)
-        r, g, b = img.pixel(3, 3)
-        
-        if r > 190 and g > 190 and b > 190:
-            return True
-        return False
+    #---------------------------
+    # 姿势检测方法
+    #---------------------------
     
     def detect_posture(self):
-        """检测姿势
+        """检测玩家姿势（站立或蹲下）
         
         Returns:
             int: 姿势 1为站立 99为蹲下
         """
-        import time
-        
-        # 获取姿势检测区域1
+        # 获取姿势检测区域
         area1 = self.resolution_config.get_posture_area(1)
         box1 = (area1['left'], area1['top'], 
                 area1['left'] + area1['width'], 
                 area1['top'] + area1['height'])
         
-        # 获取姿势检测区域2
         area2 = self.resolution_config.get_posture_area(2)
         box2 = (area2['left'], area2['top'], 
                 area2['left'] + area2['width'], 
                 area2['top'] + area2['height'])
         
-        # 检测点1
-        time.sleep(0.03)  # 优化13: 减少等待时间
-        result1 = self.get_rgb(box1)
+        # 短暂延迟确保UI稳定
+        time.sleep(0.03)
         
-        # 检测点2
+        # 检测两个点的颜色
+        result1 = self.get_rgb(box1)
         result2 = self.get_rgb(box2)
         
-        if result1 and result2:
-            return 1  # 站立
-        else:
-            return 99  # 蹲下
+        # 两个点都是白色，则为站立
+        return 1 if result1 and result2 else 99
