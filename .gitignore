@@ -1,1 +1,10 @@
 /.vscode/settings.json
+/pack2/pubg_assistant/__pycache__
+/pack2/pubg_assistant/icon
+/pack2/pubg_assistant/resources
+/pack2/pubg_assistant/build
+/pack2/pubg_assistant/pubg_assistant/__pycache__
+/pack2/pubg_assistant/pubg_assistant/config/__pycache__
+/pack2/pubg_assistant/pubg_assistant/managers/__pycache__
+/pack2/pubg_assistant/pubg_assistant/monitors/__pycache__
+/pack2/pubg_assistant/pubg_assistant/processors/__pycache__
