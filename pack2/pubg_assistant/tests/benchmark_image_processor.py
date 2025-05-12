@@ -244,7 +244,8 @@ class ImageProcessorBenchmark:
         if not test_samples:
             return "无法进行测试，缺少测试样本"
         
-        # 确保模板匹配模式关闭
+        # 确保特征点匹配模式开启
+        original_mode = self.image_processor.use_template_matching
         self.image_processor.use_template_matching = False
         
         times = []
@@ -255,9 +256,12 @@ class ImageProcessorBenchmark:
                 sample1 = test_samples[i % len(test_samples)]
                 sample2 = test_samples[(i + 1) % len(test_samples)]
                 
+                # 计算特征点和描述符
+                kp2, des2 = self.image_processor._compute_features(sample2[1]['image'])
+                
                 start_time = time.time()
                 # 执行特征点匹配
-                self.image_processor.image_similarity_opencv(sample1[1], sample2[1]['image'])
+                self.image_processor.image_similarity_opencv(sample1[1], kp2, des2)
                 end_time = time.time()
                 
                 elapsed = end_time - start_time
@@ -265,6 +269,9 @@ class ImageProcessorBenchmark:
                 
                 if i % 5 == 0:
                     print(f"  进度: {i}/{iterations}")
+        
+        # 还原特征点匹配模式
+        self.image_processor.use_template_matching = original_mode
         
         # 计算统计数据
         avg_time = sum(times) / len(times) if times else 0
@@ -315,9 +322,12 @@ class ImageProcessorBenchmark:
                 sample1 = test_samples[i % len(test_samples)]
                 sample2 = test_samples[(i + 1) % len(test_samples)]
                 
+                # 计算特征点和描述符
+                kp2, des2 = self.image_processor._compute_features(sample2[1]['image'])
+                
                 start_time = time.time()
                 # 执行模板匹配
-                self.image_processor.image_similarity_opencv(sample1[1], sample2[1]['image'])
+                self.image_processor.image_similarity_opencv(sample1[1], kp2, des2)
                 end_time = time.time()
                 
                 elapsed = end_time - start_time
