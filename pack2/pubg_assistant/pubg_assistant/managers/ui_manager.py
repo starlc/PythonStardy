@@ -117,7 +117,8 @@ class CharacterDisplayApp:
     
     def _check_update_queue(self):
         """检查更新队列"""
-        if not self.running:
+        # 如果不在运行状态或窗口已销毁，则不继续执行
+        if not self.running or not hasattr(self, 'root') or not self.root:
             return
             
         try:
@@ -132,9 +133,12 @@ class CharacterDisplayApp:
         except Exception as e:
             self.logger.error(f"处理UI更新队列失败: {str(e)}")
         
-        # 再次安排检查
-        if self.running:
-            self.root.after(100, self._check_update_queue)
+        # 再次安排检查，但先确认窗口仍然存在且程序仍在运行
+        if self.running and hasattr(self, 'root') and self.root:
+            try:
+                self.root.after(100, self._check_update_queue)
+            except Exception as e:
+                self.logger.error(f"安排UI更新检查失败: {str(e)}")
     
     def update_character(self, new_character):
         """更新显示字符
@@ -168,9 +172,23 @@ class CharacterDisplayApp:
         try:
             self.running = False
             if hasattr(self, 'root') and self.root:
+                # 取消所有pending的after回调
+                try:
+                    for after_id in self.root.tk.call('after', 'info'):
+                        self.root.after_cancel(after_id)
+                except:
+                    pass
+                # 销毁窗口
                 self.root.destroy()
                 self.root = None
             if hasattr(self, '_root') and self._root:
+                # 取消所有pending的after回调
+                try:
+                    for after_id in self._root.tk.call('after', 'info'):
+                        self._root.after_cancel(after_id)
+                except:
+                    pass
+                # 销毁窗口
                 self._root.destroy()
                 self._root = None
             self.logger.info("UI显示已关闭")

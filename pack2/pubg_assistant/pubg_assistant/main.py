@@ -144,11 +144,23 @@ def main():
         # 定义更新函数
         def update_loop():
             try:
+                # 如果已经设置了退出标志，不再继续更新
+                if exit_flag[0]:
+                    return
+                    
                 # 更新UI状态
-                action_processor._update_display()
+                try:
+                    action_processor._update_display()
+                except Exception as e:
+                    logger.error(f"更新UI显示失败: {str(e)}")
                 
                 # 更新tkinter窗口
-                root.update()
+                try:
+                    root.update()
+                except Exception as e:
+                    logger.error(f"更新tkinter窗口失败: {str(e)}")
+                    exit_flag[0] = True
+                    return
                 
                 # 检查是否请求退出程序
                 if action_processor.is_exit_requested():
@@ -157,7 +169,8 @@ def main():
                     return
                 
                 # 继续更新循环
-                root.after(100, update_loop)
+                if not exit_flag[0]:
+                    root.after(100, update_loop)
             except Exception as e:
                 logger.error(f"更新循环出错: {str(e)}")
                 exit_flag[0] = True
@@ -173,17 +186,51 @@ def main():
                 time.sleep(0.01)  # 短暂休眠以减少CPU使用
         except KeyboardInterrupt:
             logger.info("接收到键盘中断信号，准备退出程序")
+        except Exception as e:
+            # 捕获主循环中的异常，避免程序崩溃
+            logger.error(f"主循环异常: {str(e)}")
         finally:
             # 停止所有线程和服务
             logger.info("正在停止所有服务...")
-            posture_monitor.stop()
-            input_manager.stop()
-            ui_manager.stop_display()
+            
+            # 先停止输入管理器，避免继续接收输入
+            if input_manager:
+                try:
+                    input_manager.stop()
+                except Exception as e:
+                    logger.error(f"停止输入管理器失败: {str(e)}")
+            
+            # 停止姿势监控器
+            if posture_monitor:
+                try:
+                    posture_monitor.stop()
+                except Exception as e:
+                    logger.error(f"停止姿势监控器失败: {str(e)}")
+            
+            # 停止UI显示
+            if ui_manager:
+                try:
+                    ui_manager.stop_display()
+                except Exception as e:
+                    logger.error(f"停止UI显示失败: {str(e)}")
+            
+            # 销毁tkinter根窗口
             if root:
                 try:
+                    # 取消所有pending的after回调
+                    try:
+                        for after_id in root.tk.call('after', 'info'):
+                            root.after_cancel(after_id)
+                    except Exception as e:
+                        logger.error(f"取消after回调失败: {str(e)}")
+                        
+                    # 先调用quit停止主循环
+                    root.quit()
+                    # 然后销毁窗口
                     root.destroy()
-                except:
-                    pass
+                except Exception as e:
+                    logger.error(f"销毁窗口失败: {str(e)}")
+            
             logger.info("所有服务已停止，程序已退出")
     
     except PubgAssistantError as e:

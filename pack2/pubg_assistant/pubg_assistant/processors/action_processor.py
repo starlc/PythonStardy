@@ -306,9 +306,21 @@ class ActionProcessor:
     
     def _exit_program(self):
         """退出程序"""
-        with self.state_lock:
-            print("准备退出程序...")  # 直接控制台反馈
-            self.logger.info("收到退出指令，准备退出程序...")
+        try:
+            with self.state_lock:
+                print("准备退出程序...")  # 直接控制台反馈
+                self.logger.info("收到退出指令，准备退出程序...")
+                # 保存当前配置
+                try:
+                    self.config_manager.save_config("gun", str(self.player_gun))
+                    self.config_manager.save_config("posture", str(self.player_posture.value))
+                except:
+                    pass
+                # 设置退出标志
+                self.exit_flag = True
+        except Exception as e:
+            print(f"退出程序时出错: {str(e)}")
+            # 确保即使出错也设置退出标志
             self.exit_flag = True
     
     def is_exit_requested(self):
