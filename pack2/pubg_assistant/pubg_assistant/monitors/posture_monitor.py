@@ -28,22 +28,42 @@ class PostureMonitor(threading.Thread):
         self.image_processor = image_processor
         self.config_manager = config_manager
         self.action_processor = action_processor
+        
+        # 设置为守护线程，确保主线程退出时自动退出
+        self.daemon = True
     
     def run(self):
         """线程运行方法"""
         while self.__running.is_set():
-            self.__flag.wait()  # 为True时立即返回, 为False时阻塞直到内部的标识位为True后返回
-            self._check_posture()  # 姿势判断
-            time.sleep(1)  # 休眠1秒
+            try:
+                # 等待标志位，如果为False则阻塞
+                self.__flag.wait(0.1)  # 添加超时参数，便于响应停止信号
+                
+                # 如果标志位为False或线程已停止，则跳过处理
+                if not self.__flag.is_set() or not self.__running.is_set():
+                    continue
+                    
+                # 检测姿势
+                self._check_posture()
+                
+                # 短暂休眠，减少CPU使用
+                time.sleep(0.9)  # 与前面的0.1秒等待合计约1秒
+            except Exception:
+                # 捕获所有异常，确保线程不会因异常而终止
+                time.sleep(1)  # 发生异常时休眠1秒
     
     def _check_posture(self):
         """检测姿势"""
-        if self.action_processor:
-            self.action_processor.check_posture()
-        elif self.image_processor and self.config_manager:
-            # 如果没有动作处理器，但有图像处理器和配置管理器，直接处理
-            posture = self.image_processor.detect_posture()
-            self.config_manager.save_config("posture", str(posture))
+        try:
+            if self.action_processor:
+                self.action_processor.check_posture()
+            elif self.image_processor and self.config_manager:
+                # 如果没有动作处理器，但有图像处理器和配置管理器，直接处理
+                posture = self.image_processor.detect_posture()
+                self.config_manager.save_config("posture", str(posture))
+        except Exception:
+            # 捕获所有异常，确保线程不会因异常而终止
+            pass
     
     def pause(self):
         """暂停线程"""
@@ -57,6 +77,13 @@ class PostureMonitor(threading.Thread):
         """停止线程"""
         self.__flag.set()  # 将线程从暂停状态恢复, 如果已经暂停的话
         self.__running.clear()  # 设置为False
+        
+        # 尝试加入线程，但设置超时，避免阻塞
+        try:
+            if self.is_alive():
+                self.join(timeout=1.0)
+        except:
+            pass
     
     def set_image_processor(self, image_processor):
         """设置图像处理器

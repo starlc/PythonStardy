@@ -123,22 +123,25 @@ class CharacterDisplayApp:
             
         try:
             # 非阻塞方式获取更新
-            while True:
+            while self.running and not self.update_queue.empty():
                 try:
                     new_character = self.update_queue.get_nowait()
-                    self.label.config(text=new_character)
+                    if hasattr(self, 'label') and self.label:
+                        self.label.config(text=new_character)
                     self.update_queue.task_done()
                 except queue.Empty:
                     break
         except Exception as e:
-            self.logger.error(f"处理UI更新队列失败: {str(e)}")
+            if self.running:  # 只在运行状态下记录错误
+                self.logger.error(f"处理UI更新队列失败: {str(e)}")
         
         # 再次安排检查，但先确认窗口仍然存在且程序仍在运行
         if self.running and hasattr(self, 'root') and self.root:
             try:
                 self.root.after(100, self._check_update_queue)
             except Exception as e:
-                self.logger.error(f"安排UI更新检查失败: {str(e)}")
+                if self.running:  # 只在运行状态下记录错误
+                    self.logger.error(f"安排UI更新检查失败: {str(e)}")
     
     def update_character(self, new_character):
         """更新显示字符
@@ -170,27 +173,56 @@ class CharacterDisplayApp:
     def destroy(self):
         """销毁窗口"""
         try:
+            # 先设置运行状态为False
             self.running = False
+            
+            # 销毁主窗口
             if hasattr(self, 'root') and self.root:
                 # 取消所有pending的after回调
                 try:
-                    for after_id in self.root.tk.call('after', 'info'):
-                        self.root.after_cancel(after_id)
+                    pending_after_ids = self.root.tk.call('after', 'info')
+                    if pending_after_ids:
+                        for after_id in pending_after_ids:
+                            self.root.after_cancel(after_id)
                 except:
                     pass
+                
+                # 解绑所有事件
+                try:
+                    self.root.unbind("<Button-1>")
+                    self.root.unbind("<ButtonRelease-1>")
+                    self.root.unbind("<B1-Motion>")
+                    self.label.unbind("<Button-1>")
+                    self.label.unbind("<ButtonRelease-1>")
+                    self.label.unbind("<B1-Motion>")
+                except:
+                    pass
+                
                 # 销毁窗口
-                self.root.destroy()
+                try:
+                    self.root.destroy()
+                except:
+                    pass
                 self.root = None
+            
+            # 销毁根窗口
             if hasattr(self, '_root') and self._root:
                 # 取消所有pending的after回调
                 try:
-                    for after_id in self._root.tk.call('after', 'info'):
-                        self._root.after_cancel(after_id)
+                    pending_after_ids = self._root.tk.call('after', 'info')
+                    if pending_after_ids:
+                        for after_id in pending_after_ids:
+                            self._root.after_cancel(after_id)
                 except:
                     pass
+                
                 # 销毁窗口
-                self._root.destroy()
+                try:
+                    self._root.destroy()
+                except:
+                    pass
                 self._root = None
+            
             self.logger.info("UI显示已关闭")
         except Exception as e:
             self.logger.error(f"销毁UI窗口失败: {str(e)}")
@@ -304,22 +336,29 @@ class UIManager:
         """停止显示界面"""
         with self.lock:
             try:
+                # 先停止应用
                 if self.app:
                     self.app.destroy()
                     self.app = None
-                    
+                
                 # 清空队列
                 try:
-                    while True:
-                        self.update_queue.get_nowait()
-                        self.update_queue.task_done()
-                except queue.Empty:
+                    while not self.update_queue.empty():
+                        try:
+                            self.update_queue.get_nowait()
+                            self.update_queue.task_done()
+                        except queue.Empty:
+                            break
+                except:
                     pass
-                    
+                
+                # 最后设置运行状态为False
                 self.running = False
                 self.logger.info("UI显示已停止")
             except Exception as e:
                 self.logger.error(f"停止UI显示失败: {str(e)}")
+                # 确保即使出错也设置运行状态为False
+                self.running = False
     
     def is_running(self):
         """检查是否正在运行

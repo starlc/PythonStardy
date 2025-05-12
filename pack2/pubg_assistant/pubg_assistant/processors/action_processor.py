@@ -140,22 +140,29 @@ class ActionProcessor:
     
     def _update_display(self):
         """更新显示"""
+        # 如果已经请求退出，不再更新显示
+        if self.exit_flag:
+            return
+            
         with self.state_lock:
-            use_template = self.image_processor.is_using_template_matching()
-            posture_value = self.player_posture.value
-            gun_lock_value = self.gun_lock.value
-            config_value = self.player_gun_config.value
-            
-            # 获取武器名称前进行类型安全处理
-            gun_name = self.get_gun_name(self.player_gun)
-            
-            self.ui_manager.update_display_with_algorithm(
-                gun_lock_value,
-                gun_name,
-                posture_value,
-                config_value,
-                use_template
-            )
+            try:
+                use_template = self.image_processor.is_using_template_matching()
+                posture_value = self.player_posture.value
+                gun_lock_value = self.gun_lock.value
+                config_value = self.player_gun_config.value
+                
+                # 获取武器名称前进行类型安全处理
+                gun_name = self.get_gun_name(self.player_gun)
+                
+                self.ui_manager.update_display_with_algorithm(
+                    gun_lock_value,
+                    gun_name,
+                    posture_value,
+                    config_value,
+                    use_template
+                )
+            except Exception as e:
+                self.logger.error(f"更新显示失败: {str(e)}")
     
     def _save_player_gun_and_sound(self, gun_id, gun_pos):
         """保存武器到配置文件并播报
@@ -187,6 +194,10 @@ class ActionProcessor:
         Returns:
             bool: 是否处理了按键
         """
+        # 如果已经请求退出，不再处理键盘动作
+        if self.exit_flag:
+            return False
+            
         try:
             # 锁定武器栏
             if key == 4:
@@ -218,7 +229,14 @@ class ActionProcessor:
                 if self.gun_lock == WeaponLockState.UNLOCKED:
                     self._detect_weapon(key)
                 else:
-                    self._save_player_gun_and_sound(self.current_gun[key], key)
+                    # 锁定状态下直接显示已保存的武器
+                    gun_id = self.current_gun[key]
+                    if gun_id:
+                        gun_name = self.get_gun_name(int(gun_id))
+                        print(f"当前武器 [{key}]: {gun_name} (已锁定)")  # 明确显示是锁定状态
+                        self.logger.info(f"显示锁定的武器 [{key}]: {gun_name}")
+                    else:
+                        print(f"武器槽 [{key}] 未设置武器 (已锁定)")
                 return True
                 
             return False
@@ -310,12 +328,14 @@ class ActionProcessor:
             with self.state_lock:
                 print("准备退出程序...")  # 直接控制台反馈
                 self.logger.info("收到退出指令，准备退出程序...")
+                
                 # 保存当前配置
                 try:
                     self.config_manager.save_config("gun", str(self.player_gun))
                     self.config_manager.save_config("posture", str(self.player_posture.value))
                 except:
                     pass
+                
                 # 设置退出标志
                 self.exit_flag = True
         except Exception as e:
@@ -354,6 +374,10 @@ class ActionProcessor:
         Returns:
             bool: 姿势是否改变
         """
+        # 如果已经请求退出，不再检测姿势
+        if self.exit_flag:
+            return False
+            
         # 限制检测频率
         current_time = time.time()
         if current_time - self.last_posture_check_time < self.POSTURE_CHECK_INTERVAL:

@@ -122,19 +122,26 @@ class InputManager:
             if not self.is_running:
                 return
                 
+            # 先设置运行状态为False
             self.is_running = False
             
             # 停止键盘监听器
             if self.keyboard_listener:
-                self.keyboard_listener.stop()
+                try:
+                    self.keyboard_listener.stop()
+                except:
+                    pass
                 self.keyboard_listener = None
             
             # 停止鼠标监听器
             if self.mouse_listener:
-                self.mouse_listener.stop()
+                try:
+                    self.mouse_listener.stop()
+                except:
+                    pass
                 self.mouse_listener = None
             
-            # 清空队列并发送退出信号
+            # 清空队列
             try:
                 while not self.action_queue.empty():
                     try:
@@ -144,6 +151,14 @@ class InputManager:
                         pass
             except:
                 pass
+            
+            # 等待消费者线程结束
+            if self.consumer_thread and self.consumer_thread.is_alive():
+                try:
+                    self.consumer_thread.join(timeout=1.0)  # 最多等待1秒
+                except:
+                    pass
+                self.consumer_thread = None
                 
             self.logger.info("输入管理器已停止")
     
@@ -156,12 +171,14 @@ class InputManager:
                 # 带超时的获取，让线程能够正常退出
                 try:
                     action = self.action_queue.get(timeout=self.QUEUE_TIMEOUT)
-                    self._process_action(action)
+                    if self.is_running:  # 再次检查运行状态
+                        self._process_action(action)
                     self.action_queue.task_done()
                 except Empty:
                     continue
             except Exception as e:
-                self.logger.error(f"处理输入动作失败: {str(e)}")
+                if self.is_running:  # 只在运行状态下记录错误
+                    self.logger.error(f"处理输入动作失败: {str(e)}")
                 
         self.logger.info("输入消费者线程退出")
     
@@ -194,6 +211,10 @@ class InputManager:
         Returns:
             bool: True继续监听，False停止监听
         """
+        # 如果不在运行状态，不处理输入
+        if not self.is_running:
+            return False
+            
         try:
             # 防止队列过载
             if self.action_queue.qsize() >= self.QUEUE_SIZE - 10:
@@ -238,26 +259,6 @@ class InputManager:
         
         return True  # 继续监听
     
-    def _clear_queue_and_add_action(self, action):
-        """清空队列并添加动作
-        
-        Args:
-            action: 要添加的动作
-        """
-        try:
-            # 清空现有队列
-            while not self.action_queue.empty():
-                try:
-                    self.action_queue.get_nowait()
-                    self.action_queue.task_done()
-                except:
-                    pass
-                    
-            # 添加新动作
-            self.action_queue.put(action)
-        except Exception as e:
-            self.logger.error(f"处理队列操作失败: {str(e)}")
-    
     def _on_click(self, x, y, button, pressed):
         """鼠标点击事件处理
         
@@ -267,6 +268,10 @@ class InputManager:
             button: 鼠标按键
             pressed: 是否按下
         """
+        # 如果不在运行状态，不处理输入
+        if not self.is_running:
+            return False
+            
         try:
             if Button.x2 == button:
                 if self.posture_monitor:
@@ -280,6 +285,32 @@ class InputManager:
                         self.posture_monitor.pause()
         except Exception as e:
             self.logger.error(f"处理鼠标输入失败: {str(e)}")
+            
+        return True  # 继续监听
+    
+    def _clear_queue_and_add_action(self, action):
+        """清空队列并添加动作
+        
+        Args:
+            action: 要添加的动作
+        """
+        # 如果不在运行状态，不处理输入
+        if not self.is_running:
+            return
+            
+        try:
+            # 清空现有队列
+            while not self.action_queue.empty():
+                try:
+                    self.action_queue.get_nowait()
+                    self.action_queue.task_done()
+                except:
+                    pass
+                    
+            # 添加新动作
+            self.action_queue.put(action)
+        except Exception as e:
+            self.logger.error(f"处理队列操作失败: {str(e)}")
     
     def set_action_processor(self, action_processor):
         """设置动作处理器

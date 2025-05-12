@@ -192,26 +192,27 @@ class ImageProcessor:
     #---------------------------
     
     def screenshot(self, box):
-        """截取屏幕指定区域
+        """截图
         
         Args:
-            box: 截图区域 (left, top, width, height)
+            box: 截图区域
             
         Returns:
-            shot: 截图对象
+            PIL.Image: 截图结果
         """
         try:
             sct = self._get_sct()
-            return sct.grab(box)
+            shot = sct.grab(box)
+            return Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
         except Exception as e:
             self.logger.error(f"截图失败: {str(e)}")
-            raise ImageProcessingError(f"截图失败: {str(e)}")
+            return None
     
-    def save_temp_pic(self, img, path, is_save):
-        """保存临时图片，用于调试
+    def save_temp_pic(self, img, path, is_save=True):
+        """保存临时图片
         
         Args:
-            img: 图片对象（可能是mss截图或numpy数组）
+            img: 图像数据，可以是mss截图对象或numpy数组
             path: 保存路径
             is_save: 是否保存
             
@@ -222,26 +223,31 @@ class ImageProcessor:
             return True
             
         try:
-            # 生成唯一的文件名
-            save_path = os.path.abspath(path)
-            if not save_path.endswith('.png'):
-                save_path = save_path + self._get_sequence() + '.png'
-                
-            # 根据输入图像类型进行不同处理
+            # 确保目录存在
+            os.makedirs(os.path.dirname(path), exist_ok=True)
+            
+            # 根据图像类型进行不同处理
             if isinstance(img, np.ndarray):
-                # 如果是numpy数组，直接保存
-                cv.imwrite(save_path, img)
-            elif hasattr(img, 'bgra'):
-                # 如果是mss截图，先转换为PIL图像
-                pil_img = Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX")
-                pil_img.save(save_path, format='PNG')
+                # 处理numpy数组
+                cv.imwrite(path, img)
             else:
-                # 其他情况尝试直接保存
-                cv.imwrite(save_path, np.array(img))
-                
+                # 处理其他类型
+                try:
+                    # 尝试将图像转换为PIL Image并保存
+                    if hasattr(img, 'size') and hasattr(img, 'bgra'):
+                        # 这是mss截图对象
+                        Image.frombytes("RGB", img.size, img.bgra, "raw", "BGRX").save(path)
+                    else:
+                        # 尝试直接保存
+                        img.save(path)
+                except:
+                    # 如果转换失败，记录调试信息
+                    self.logger.debug(f"无法保存图像: {type(img)}")
+                    return False
+            
             return True
         except Exception as e:
-            # 不再记录错误日志，避免过多日志输出
+            self.logger.debug(f"保存临时图片失败: {str(e)}")
             return False
     
     def extract_gun(self, image):
@@ -264,34 +270,32 @@ class ImageProcessor:
         return opening
     
     def get_rgb(self, box):
-        """获取指定区域的RGB值，判断是否为白色
+        """获取区域RGB值，判断是否为白色
         
         Args:
-            box: 截图区域 (left, top, width, height)
+            box: 区域坐标
             
         Returns:
             bool: 是否为白色
         """
         try:
             # 截图
-            img = self.screenshot(box)
+            shot = self.screenshot(box)
+            if shot is None:
+                self.logger.debug("截图失败，无法获取RGB值")
+                return False
+                
+            # 转换为numpy数组
+            shot_array = np.array(shot)
             
-            # 从截图中获取特定点的RGB值
-            if hasattr(img, 'pixel'):
-                # 如果是mss截图对象
-                r, g, b = img.pixel(3, 3)
-            else:
-                # 如果是numpy数组，转换为RGB格式
-                img_array = np.array(img)
-                if img_array.shape[2] >= 3:  # 确保有RGB通道
-                    b, g, r = img_array[3, 3, :3]  # OpenCV格式为BGR
-                else:
-                    return False
+            # 计算平均亮度
+            avg_brightness = np.mean(shot_array)
             
-            # 判断是否为白色（亮色）
-            return r > self.WHITE_THRESHOLD and g > self.WHITE_THRESHOLD and b > self.WHITE_THRESHOLD
+            # 判断是否为白色
+            is_white = avg_brightness > self.WHITE_THRESHOLD
+            
+            return is_white
         except Exception as e:
-            # 失败时记录到日志，但不打印到控制台
             self.logger.debug(f"获取RGB值失败: {str(e)}")
             return False
     
@@ -486,14 +490,24 @@ class ImageProcessor:
             # 截图
             start_time = time.time()
             shot = self.screenshot(weapon_area)
-            gray_pic = cv.cvtColor(np.array(shot), cv.COLOR_RGB2GRAY)
+            if shot is None:
+                self.logger.warning(f"截图失败，无法检测武器位置 {gun_pos}")
+                return "", 0
+                
+            # 转换为灰度图
+            try:
+                gray_pic = cv.cvtColor(np.array(shot), cv.COLOR_RGB2GRAY)
+            except Exception as e:
+                self.logger.warning(f"图像转换失败: {str(e)}")
+                return "", 0
             
             # 预处理提高对比度
             gray_pic = self._preprocess_image(gray_pic)
             
             # 保存临时图片（如果需要）
-            gun_temp_file = os.path.join(self.temp_dir, f"gun{gun_pos}.png")
-            self.save_temp_pic(gray_pic, gun_temp_file, self.save_temp_images)
+            if self.save_temp_images:
+                gun_temp_file = os.path.join(self.temp_dir, f"gun{gun_pos}.png")
+                self.save_temp_pic(gray_pic, gun_temp_file, True)
             
             # 根据选择的算法进行匹配
             if self.use_template_matching:
@@ -512,7 +526,7 @@ class ImageProcessor:
             elif similarity >= self.LOW_SIMILARITY_THRESHOLD:
                 self.logger.info(f"低可信度识别武器: {best_match}, 相似度: {similarity:.0f}%, 处理时间: {process_time:.1f}毫秒")
             else:
-                self.logger.warning(f"未能识别武器, 最高相似度: {similarity:.0f}%, 处理时间: {process_time:.1f}毫秒")
+                self.logger.debug(f"未能识别武器, 最高相似度: {similarity:.0f}%, 处理时间: {process_time:.1f}毫秒")
             
             return best_match, similarity
             
@@ -535,11 +549,12 @@ class ImageProcessor:
             is_white1 = self.get_rgb(area1)
             is_white2 = self.get_rgb(area2)
             
-            # 根据检测结果确定姿势，并输出到控制台
-            if is_white1 and is_white2:
-                return 1  # 站立
-            else:
-                return 2  # 蹲下
+            # 根据检测结果确定姿势
+            posture = 1 if is_white1 and is_white2 else 2  # 1为站立，2为蹲下
+            posture_name = "站立" if posture == 1 else "蹲下"
+            self.logger.debug(f"检测到姿势: {posture_name}")
+            
+            return posture
                 
         except Exception as e:
             self.logger.error(f"姿势检测失败: {str(e)}")

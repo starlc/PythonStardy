@@ -219,17 +219,20 @@ def main():
                 try:
                     # 取消所有pending的after回调
                     try:
-                        for after_id in root.tk.call('after', 'info'):
-                            root.after_cancel(after_id)
+                        # 使用更安全的方式获取和取消after回调
+                        pending_after_ids = root.tk.call('after', 'info')
+                        if pending_after_ids:
+                            for after_id in pending_after_ids:
+                                root.after_cancel(after_id)
                     except Exception as e:
-                        logger.error(f"取消after回调失败: {str(e)}")
+                        pass
                         
-                    # 先调用quit停止主循环
+                    # 先调用quit停止主循环，然后销毁窗口
                     root.quit()
-                    # 然后销毁窗口
+                    root.update()  # 处理剩余事件
                     root.destroy()
                 except Exception as e:
-                    logger.error(f"销毁窗口失败: {str(e)}")
+                    pass
             
             logger.info("所有服务已停止，程序已退出")
     
